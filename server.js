@@ -7,6 +7,7 @@ const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 
 const connectDB = require('./config/db');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 
@@ -31,6 +32,8 @@ const globalLimiter = rateLimit({
   message: { error: 'Too many requests. Please try again later.' },
 });
 app.use(globalLimiter);
+
+app.use('/api/auth', authRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({
