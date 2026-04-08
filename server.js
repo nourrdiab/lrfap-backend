@@ -12,6 +12,8 @@ const specialtyRoutes = require('./routes/specialtyRoutes');
 const universityRoutes = require('./routes/universityRoutes');
 const cycleRoutes = require('./routes/cycleRoutes');
 const programRoutes = require('./routes/programRoutes');
+const applicantProfileRoutes = require('./routes/applicantProfileRoutes');
+const applicationRoutes = require('./routes/applicationRoutes');
 
 const app = express();
 
@@ -42,6 +44,8 @@ app.use('/api/specialties', specialtyRoutes);
 app.use('/api/universities', universityRoutes);
 app.use('/api/cycles', cycleRoutes);
 app.use('/api/programs', programRoutes);
+app.use('/api/applicant-profile', applicantProfileRoutes);
+app.use('/api/applications', applicationRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({
