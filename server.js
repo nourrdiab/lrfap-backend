@@ -5,8 +5,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
+const mongoose = require('mongoose');
 
-const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const specialtyRoutes = require('./routes/specialtyRoutes');
 const universityRoutes = require('./routes/universityRoutes');
@@ -18,6 +18,23 @@ const universityReviewRoutes = require('./routes/universityReviewRoutes');
 const matchRoutes = require('./routes/matchRoutes');
 
 const app = express();
+
+let dbReady = null;
+const connectDB = () => {
+  if (dbReady) return dbReady;
+  dbReady = mongoose
+    .connect(process.env.MONGODB_URI)
+    .then((conn) => {
+      console.log(`MongoDB connected: ${conn.connection.host}`);
+      return conn;
+    })
+    .catch((err) => {
+      dbReady = null;
+      console.error('MongoDB connection error:', err.message);
+      throw err;
+    });
+  return dbReady;
+};
 
 app.use(helmet());
 
@@ -40,6 +57,15 @@ const globalLimiter = rateLimit({
   message: { error: 'Too many requests. Please try again later.' },
 });
 app.use(globalLimiter);
+
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    res.status(503).json({ error: 'Database unavailable' });
+  }
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/specialties', specialtyRoutes);
@@ -79,12 +105,13 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-const startServer = async () => {
-  await connectDB();
-  app.listen(PORT, () => {
-    console.log(`LRFAP backend running on http://localhost:${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+if (require.main === module) {
+  connectDB().then(() => {
+    app.listen(PORT, () => {
+      console.log(`LRFAP backend running on http://localhost:${PORT}`);
+      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    });
   });
-};
+}
 
-startServer();
+module.exports = app;
