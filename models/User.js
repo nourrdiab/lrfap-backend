@@ -34,6 +34,10 @@ const userSchema = new mongoose.Schema(
       enum: ['applicant', 'university', 'lgc'],
       required: true,
       default: 'applicant',
+    },university: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'University',
+      default: null,
     },
     isActive: {
       type: Boolean,

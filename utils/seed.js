@@ -90,7 +90,7 @@ const seed = async () => {
 
     console.log(`Seeded: ${insertedUniversities.length} universities, ${insertedSpecialties.length} specialties, 1 cycle, ${programs.length} programs`);
 
-    const lgcEmail = 'lgc.admin@lrfap.gov.lb';
+const lgcEmail = 'lgc.admin@lrfap.gov.lb';
     const existingLgc = await User.findOne({ email: lgcEmail });
     if (!existingLgc) {
       await User.create({
@@ -103,6 +103,23 @@ const seed = async () => {
       console.log(`Created LGC admin user: ${lgcEmail} / LgcAdmin2026!`);
     } else {
       console.log(`LGC admin already exists: ${lgcEmail}`);
+    }
+
+    const aub = insertedUniversities.find((u) => u.code === 'AUB');
+    const uniEmail = 'aub.admin@lrfap.test';
+    const existingUni = await User.findOne({ email: uniEmail });
+    if (!existingUni) {
+      await User.create({
+        email: uniEmail,
+        password: 'AubAdmin2026!',
+        firstName: 'AUB',
+        lastName: 'Reviewer',
+        role: 'university',
+        university: aub._id,
+      });
+      console.log(`Created AUB university user: ${uniEmail} / AubAdmin2026!`);
+    } else {
+      console.log(`AUB university user already exists: ${uniEmail}`);
     }
 
     await mongoose.disconnect();
