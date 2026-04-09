@@ -70,4 +70,23 @@ const matchUnmatchedTemplate = ({ firstName, applicationLink }) => `
   </div>
 `;
 
-module.exports = { sendEmail, matchPublishedTemplate, matchUnmatchedTemplate };
+const passwordResetTemplate = ({ firstName, resetLink }) => `
+  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+    <div style="background: #1a3a5c; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+      <h1 style="margin: 0; font-size: 24px;">LRFAP Password Reset</h1>
+    </div>
+    <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px;">
+      <p style="font-size: 16px;">Dear ${firstName},</p>
+      <p style="font-size: 16px;">We received a request to reset the password for your LRFAP account. Click the button below to choose a new password.</p>
+      <p style="text-align: center; margin: 30px 0;">
+        <a href="${resetLink}" style="background: #1a3a5c; color: white; padding: 12px 32px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold;">Reset My Password</a>
+      </p>
+      <p style="font-size: 14px; color: #555;">This link will expire in <strong>1 hour</strong>. If you did not request a password reset, you can safely ignore this email — your password will remain unchanged.</p>
+      <p style="font-size: 14px; color: #666; border-top: 1px solid #ddd; padding-top: 16px; margin-top: 30px;">
+        This is an automated message from the LRFAP system. Please do not reply directly to this email.
+      </p>
+    </div>
+  </div>
+`;
+
+module.exports = { sendEmail, matchPublishedTemplate, matchUnmatchedTemplate, passwordResetTemplate };

@@ -1,9 +1,12 @@
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const {
   generateAccessToken,
   generateRefreshToken,
 } = require('../utils/jwt');
 const { logAction } = require('../utils/audit');
+const { sendEmail, passwordResetTemplate } = require('../utils/email');
 
 const refreshCookieOptions = {
   httpOnly: true,
@@ -131,8 +134,6 @@ const logout = (req, res) => {
   return res.status(200).json({ message: 'Logout successful' });
 };
 
-const jwt = require('jsonwebtoken');
-
 const refresh = async (req, res) => {
   try {
     const token = req.cookies?.refreshToken;
@@ -227,10 +228,100 @@ const createUser = async (req, res) => {
   }
 };
 
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    if (user) {
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+      user.passwordResetToken = hashedToken;
+      user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
+      await user.save();
+
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const resetLink = `${frontendUrl}/reset-password?token=${rawToken}`;
+
+      sendEmail({
+        to: user.email,
+        subject: 'LRFAP — Password reset request',
+        html: passwordResetTemplate({
+          firstName: user.firstName,
+          resetLink,
+        }),
+      }).catch((err) => console.error('Password reset email failed:', err.message));
+
+      await logAction({
+        actor: user._id,
+        actorRole: user.role,
+        action: 'PASSWORD_RESET_REQUESTED',
+        targetType: 'User',
+        targetId: user._id,
+        ipAddress: req.ip,
+      });
+    }
+
+    return res.status(200).json({
+      message: 'If an account with that email exists, a password reset link has been sent.',
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    return res.status(500).json({ error: 'Password reset request failed' });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Token and new password are required' });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: new Date() },
+    }).select('+passwordResetToken +passwordResetExpires');
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+
+    user.password = newPassword;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+
+    await logAction({
+      actor: user._id,
+      actorRole: user.role,
+      action: 'PASSWORD_RESET_COMPLETED',
+      targetType: 'User',
+      targetId: user._id,
+      ipAddress: req.ip,
+    });
+
+    return res.status(200).json({ message: 'Password has been reset successfully' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    return res.status(500).json({ error: 'Password reset failed' });
+  }
+};
+
 module.exports = {
   register,
   login,
   logout,
   refresh,
   createUser,
+  forgotPassword,
+  resetPassword,
 };

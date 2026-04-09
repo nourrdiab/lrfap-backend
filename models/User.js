@@ -34,7 +34,8 @@ const userSchema = new mongoose.Schema(
       enum: ['applicant', 'university', 'lgc'],
       required: true,
       default: 'applicant',
-    },university: {
+    },
+    university: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'University',
       default: null,
@@ -45,6 +46,14 @@ const userSchema = new mongoose.Schema(
     },
     lastLoginAt: {
       type: Date,
+    },
+    passwordResetToken: {
+      type: String,
+      select: false,
+    },
+    passwordResetExpires: {
+      type: Date,
+      select: false,
     },
   },
   {
