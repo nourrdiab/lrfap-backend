@@ -131,8 +131,53 @@ const logout = (req, res) => {
   return res.status(200).json({ message: 'Logout successful' });
 };
 
+const jwt = require('jsonwebtoken');
+
+const refresh = async (req, res) => {
+  try {
+    const token = req.cookies?.refreshToken;
+    if (!token) {
+      return res.status(401).json({ error: 'No refresh token provided' });
+    }
+
+    let payload;
+    try {
+      payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+    } catch (err) {
+      return res.status(401).json({ error: 'Invalid or expired refresh token' });
+    }
+
+    if (payload.type !== 'refresh') {
+      return res.status(401).json({ error: 'Invalid token type' });
+    }
+
+    const user = await User.findById(payload.userId);
+    if (!user || !user.isActive) {
+      return res.status(401).json({ error: 'User not found or inactive' });
+    }
+
+    const accessToken = generateAccessToken(user._id, user.role);
+
+    return res.status(200).json({
+      message: 'Token refreshed',
+      accessToken,
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error('Refresh error:', error);
+    return res.status(500).json({ error: 'Token refresh failed' });
+  }
+};
+
 module.exports = {
   register,
   login,
   logout,
+  refresh,
 };
