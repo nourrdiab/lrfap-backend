@@ -6,6 +6,7 @@ const MatchRun = require('../models/MatchRun');
 const Notification = require('../models/Notification');
 const { runGaleShapley } = require('../utils/matching');
 const { logAction } = require('../utils/audit');
+const { sendEmail, matchPublishedTemplate, matchUnmatchedTemplate } = require('../utils/email');
 
 const gatherInputs = async (cycleId, track) => {
   const submittedApplications = await Application.find({
@@ -286,25 +287,78 @@ exports.publishResults = async (req, res) => {
       ipAddress: req.ip,
     });
 
-    const matchedApps = await Application.find({
+    const allRelevantApps = await Application.find({
       cycle: cycleId,
       track,
-      status: 'matched',
-    }).populate('matchedProgram');
+      status: { $in: ['matched', 'unmatched'] },
+    });
 
-    const notifications = matchedApps.map((app) => ({
+    const notifications = allRelevantApps.map((app) => ({
       user: app.applicant,
       type: 'match_published',
       title: 'Match results published',
-      message: 'Your residency match results are now available. Log in to view and accept your offer.',
+      message:
+        app.status === 'matched'
+          ? 'Your residency match results are now available. Log in to view and accept your offer.'
+          : 'The match results have been published. View your application for details.',
       link: `/applicant/applications/${app._id}`,
-      metadata: { applicationId: app._id, matchedProgramId: app.matchedProgram?._id },
+      metadata: { applicationId: app._id, status: app.status },
     }));
 
     if (notifications.length > 0) {
       await Notification.insertMany(notifications).catch((err) =>
         console.error('Bulk notification error:', err.message)
       );
+    }
+
+    const matchedAppsForEmail = await Application.find({
+      cycle: cycleId,
+      track,
+      status: 'matched',
+    })
+      .populate('applicant', 'firstName lastName email')
+      .populate({
+        path: 'matchedProgram',
+        populate: [
+          { path: 'university', select: 'name' },
+          { path: 'specialty', select: 'name' },
+        ],
+      });
+
+    const unmatchedAppsForEmail = await Application.find({
+      cycle: cycleId,
+      track,
+      status: 'unmatched',
+    }).populate('applicant', 'firstName lastName email');
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+    for (const app of matchedAppsForEmail) {
+      if (!app.applicant?.email) continue;
+      const programName = app.matchedProgram?.specialty?.name || 'your matched program';
+      const universityName = app.matchedProgram?.university?.name || '';
+      sendEmail({
+        to: app.applicant.email,
+        subject: 'LRFAP — Your match results are published',
+        html: matchPublishedTemplate({
+          firstName: app.applicant.firstName,
+          programName,
+          universityName,
+          applicationLink: `${frontendUrl}/applicant/applications/${app._id}`,
+        }),
+      }).catch((err) => console.error('Email send failed:', err.message));
+    }
+
+    for (const app of unmatchedAppsForEmail) {
+      if (!app.applicant?.email) continue;
+      sendEmail({
+        to: app.applicant.email,
+        subject: 'LRFAP — Match results are published',
+        html: matchUnmatchedTemplate({
+          firstName: app.applicant.firstName,
+          applicationLink: `${frontendUrl}/applicant/applications/${app._id}`,
+        }),
+      }).catch((err) => console.error('Email send failed:', err.message));
     }
 
     res.json({
