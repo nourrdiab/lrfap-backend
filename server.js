@@ -18,6 +18,7 @@ const universityReviewRoutes = require('./routes/universityReviewRoutes');
 const matchRoutes = require('./routes/matchRoutes');
 const auditRoutes = require('./routes/auditRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 
@@ -80,6 +81,7 @@ app.use('/api/university-review', universityReviewRoutes);
 app.use('/api/match', matchRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({

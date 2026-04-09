@@ -3,6 +3,7 @@ const Program = require('../models/Program');
 const Cycle = require('../models/Cycle');
 const ApplicantProfile = require('../models/ApplicantProfile');
 const { logAction } = require('../utils/audit');
+const { notify } = require('../utils/notify');
 
 const generateReference = (track, year) => {
   const prefix = track === 'residency' ? 'R' : 'F';
@@ -160,6 +161,15 @@ exports.submitApplication = async (req, res) => {
       targetId: application._id,
       metadata: { submissionReference: application.submissionReference, track: application.track },
       ipAddress: req.ip,
+    });
+
+    await notify({
+      user: req.user._id,
+      type: 'application_submitted',
+      title: 'Application submitted',
+      message: `Your application has been received. Reference: ${application.submissionReference}`,
+      link: `/applicant/applications/${application._id}`,
+      metadata: { applicationId: application._id, submissionReference: application.submissionReference },
     });
 
     res.json({

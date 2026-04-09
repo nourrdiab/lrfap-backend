@@ -3,6 +3,7 @@ const Program = require('../models/Program');
 const ProgramRanking = require('../models/ProgramRanking');
 const Cycle = require('../models/Cycle');
 const { logAction } = require('../utils/audit');
+const { notify } = require('../utils/notify');
 
 const ensureProgramBelongsToUser = async (programId, user) => {
   const program = await Program.findById(programId);
@@ -201,6 +202,15 @@ exports.submitProgramRanking = async (req, res) => {
       targetId: ranking._id,
       metadata: { programId, cycleId: program.cycle },
       ipAddress: req.ip,
+    });
+
+    await notify({
+      user: req.user._id,
+      type: 'ranking_submitted',
+      title: 'Ranking submitted',
+      message: 'Your program ranking has been submitted and locked.',
+      link: `/university/programs/${programId}/ranking`,
+      metadata: { programId, rankingId: ranking._id },
     });
 
     res.json({ message: 'Ranking submitted successfully', ranking });

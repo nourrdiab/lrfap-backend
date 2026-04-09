@@ -3,6 +3,7 @@ const ProgramRanking = require('../models/ProgramRanking');
 const Program = require('../models/Program');
 const Cycle = require('../models/Cycle');
 const MatchRun = require('../models/MatchRun');
+const Notification = require('../models/Notification');
 const { runGaleShapley } = require('../utils/matching');
 const { logAction } = require('../utils/audit');
 
@@ -284,6 +285,27 @@ exports.publishResults = async (req, res) => {
       metadata: { track, matchRunId: officialRun._id },
       ipAddress: req.ip,
     });
+
+    const matchedApps = await Application.find({
+      cycle: cycleId,
+      track,
+      status: 'matched',
+    }).populate('matchedProgram');
+
+    const notifications = matchedApps.map((app) => ({
+      user: app.applicant,
+      type: 'match_published',
+      title: 'Match results published',
+      message: 'Your residency match results are now available. Log in to view and accept your offer.',
+      link: `/applicant/applications/${app._id}`,
+      metadata: { applicationId: app._id, matchedProgramId: app.matchedProgram?._id },
+    }));
+
+    if (notifications.length > 0) {
+      await Notification.insertMany(notifications).catch((err) =>
+        console.error('Bulk notification error:', err.message)
+      );
+    }
 
     res.json({
       message: 'Results published successfully',
