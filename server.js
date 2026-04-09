@@ -19,6 +19,8 @@ const matchRoutes = require('./routes/matchRoutes');
 const auditRoutes = require('./routes/auditRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./utils/swagger');
 
 const app = express();
 
@@ -68,6 +70,15 @@ app.use(async (req, res, next) => {
   } catch (error) {
     res.status(503).json({ error: 'Database unavailable' });
   }
+});
+
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customSiteTitle: 'LRFAP API Docs',
+  customCss: '.swagger-ui .topbar { display: none }',
+}));
+
+app.get('/api/docs.json', (req, res) => {
+  res.json(swaggerSpec);
 });
 
 app.use('/api/auth', authRoutes);
