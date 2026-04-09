@@ -235,3 +235,37 @@ exports.getMatchRun = async (req, res) => {
   if (!run) return res.status(404).json({ error: 'Match run not found' });
   res.json(run);
 };
+
+exports.publishResults = async (req, res) => {
+  try {
+    const { cycleId, track } = req.body;
+
+    const cycle = await Cycle.findById(cycleId);
+    if (!cycle) return res.status(404).json({ error: 'Cycle not found' });
+    if (cycle.status !== 'matching') {
+      return res.status(400).json({ error: `Cycle is in ${cycle.status} state, cannot publish` });
+    }
+
+    const officialRun = await MatchRun.findOne({
+      cycle: cycleId,
+      track,
+      runType: 'official',
+      status: 'completed',
+    });
+    if (!officialRun) {
+      return res.status(400).json({ error: 'No completed official match run found for this cycle and track' });
+    }
+
+    cycle.status = 'published';
+    await cycle.save();
+
+    res.json({
+      message: 'Results published successfully',
+      cycle,
+      matchRunId: officialRun._id,
+    });
+  } catch (error) {
+    console.error('Publish results error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
