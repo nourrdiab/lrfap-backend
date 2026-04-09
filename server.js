@@ -16,6 +16,8 @@ const applicantProfileRoutes = require('./routes/applicantProfileRoutes');
 const applicationRoutes = require('./routes/applicationRoutes');
 const universityReviewRoutes = require('./routes/universityReviewRoutes');
 const matchRoutes = require('./routes/matchRoutes');
+const auditRoutes = require('./routes/auditRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 
 const app = express();
 
@@ -76,6 +78,8 @@ app.use('/api/applicant-profile', applicantProfileRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/university-review', universityReviewRoutes);
 app.use('/api/match', matchRoutes);
+app.use('/api/audit', auditRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({

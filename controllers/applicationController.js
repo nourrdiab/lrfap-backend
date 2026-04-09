@@ -2,6 +2,7 @@ const Application = require('../models/Application');
 const Program = require('../models/Program');
 const Cycle = require('../models/Cycle');
 const ApplicantProfile = require('../models/ApplicantProfile');
+const { logAction } = require('../utils/audit');
 
 const generateReference = (track, year) => {
   const prefix = track === 'residency' ? 'R' : 'F';
@@ -150,6 +151,17 @@ exports.submitApplication = async (req, res) => {
     application.submissionReference = generateReference(application.track, cycle.year);
 
     await application.save();
+
+    await logAction({
+      actor: req.user._id,
+      actorRole: req.user.role,
+      action: 'APPLICATION_SUBMITTED',
+      targetType: 'Application',
+      targetId: application._id,
+      metadata: { submissionReference: application.submissionReference, track: application.track },
+      ipAddress: req.ip,
+    });
+
     res.json({
       message: 'Application submitted successfully',
       submissionReference: application.submissionReference,
@@ -208,8 +220,6 @@ exports.acceptOffer = async (req, res) => {
 
 exports.declineOffer = async (req, res) => {
   try {
-    const Program = require('../models/Program');
-
     const application = await Application.findById(req.params.id);
     if (!application) return res.status(404).json({ error: 'Application not found' });
     if (application.applicant.toString() !== req.user._id.toString()) {

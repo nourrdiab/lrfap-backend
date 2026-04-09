@@ -2,6 +2,7 @@ const Application = require('../models/Application');
 const Program = require('../models/Program');
 const ProgramRanking = require('../models/ProgramRanking');
 const Cycle = require('../models/Cycle');
+const { logAction } = require('../utils/audit');
 
 const ensureProgramBelongsToUser = async (programId, user) => {
   const program = await Program.findById(programId);
@@ -191,6 +192,16 @@ exports.submitProgramRanking = async (req, res) => {
     ranking.submittedAt = new Date();
     ranking.submittedBy = req.user._id;
     await ranking.save();
+
+    await logAction({
+      actor: req.user._id,
+      actorRole: req.user.role,
+      action: 'PROGRAM_RANKING_SUBMITTED',
+      targetType: 'ProgramRanking',
+      targetId: ranking._id,
+      metadata: { programId, cycleId: program.cycle },
+      ipAddress: req.ip,
+    });
 
     res.json({ message: 'Ranking submitted successfully', ranking });
   } catch (error) {

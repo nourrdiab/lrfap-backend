@@ -4,6 +4,7 @@ const Program = require('../models/Program');
 const Cycle = require('../models/Cycle');
 const MatchRun = require('../models/MatchRun');
 const { runGaleShapley } = require('../utils/matching');
+const { logAction } = require('../utils/audit');
 
 const gatherInputs = async (cycleId, track) => {
   const submittedApplications = await Application.find({
@@ -202,6 +203,21 @@ exports.executeMatch = async (req, res) => {
     };
     await matchRun.save();
 
+    await logAction({
+      actor: req.user._id,
+      actorRole: req.user.role,
+      action: 'MATCH_RUN_EXECUTED',
+      targetType: 'MatchRun',
+      targetId: matchRun._id,
+      metadata: {
+        cycleId,
+        track,
+        totalMatched: result.totalMatched,
+        totalUnmatched: result.unmatchedApplicants.length,
+      },
+      ipAddress: req.ip,
+    });
+
     res.json({
       message: 'Official match run completed',
       matchRunId: matchRun._id,
@@ -258,6 +274,16 @@ exports.publishResults = async (req, res) => {
 
     cycle.status = 'published';
     await cycle.save();
+
+    await logAction({
+      actor: req.user._id,
+      actorRole: req.user.role,
+      action: 'RESULTS_PUBLISHED',
+      targetType: 'Cycle',
+      targetId: cycle._id,
+      metadata: { track, matchRunId: officialRun._id },
+      ipAddress: req.ip,
+    });
 
     res.json({
       message: 'Results published successfully',

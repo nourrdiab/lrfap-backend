@@ -3,6 +3,7 @@ const {
   generateAccessToken,
   generateRefreshToken,
 } = require('../utils/jwt');
+const { logAction } = require('../utils/audit');
 
 const refreshCookieOptions = {
   httpOnly: true,
@@ -38,6 +39,15 @@ const register = async (req, res) => {
     const refreshToken = generateRefreshToken(user._id);
 
     res.cookie('refreshToken', refreshToken, refreshCookieOptions);
+
+    await logAction({
+      actor: user._id,
+      actorRole: user.role,
+      action: 'USER_REGISTERED',
+      targetType: 'User',
+      targetId: user._id,
+      ipAddress: req.ip,
+    });
 
     return res.status(201).json({
       message: 'Registration successful',
@@ -84,6 +94,15 @@ const login = async (req, res) => {
 
     user.lastLoginAt = new Date();
     await user.save();
+
+    await logAction({
+      actor: user._id,
+      actorRole: user.role,
+      action: 'USER_LOGIN',
+      targetType: 'User',
+      targetId: user._id,
+      ipAddress: req.ip,
+    });
 
     const accessToken = generateAccessToken(user._id, user.role);
     const refreshToken = generateRefreshToken(user._id);
