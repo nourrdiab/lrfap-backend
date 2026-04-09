@@ -175,9 +175,62 @@ const refresh = async (req, res) => {
   }
 };
 
+const createUser = async (req, res) => {
+  try {
+    const { email, password, firstName, lastName, role, university } = req.body;
+
+    if (!['university', 'lgc'].includes(role)) {
+      return res.status(400).json({ error: 'Role must be university or lgc' });
+    }
+    if (role === 'university' && !university) {
+      return res.status(400).json({ error: 'University ID is required for university role' });
+    }
+
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return res.status(409).json({ error: 'Email is already registered' });
+    }
+
+    const userData = { email, password, firstName, lastName, role };
+    if (role === 'university') userData.university = university;
+
+    const user = await User.create(userData);
+
+    await logAction({
+      actor: req.user._id,
+      actorRole: req.user.role,
+      action: 'USER_CREATED_BY_ADMIN',
+      targetType: 'User',
+      targetId: user._id,
+      metadata: { createdRole: role, email: user.email },
+      ipAddress: req.ip,
+    });
+
+    return res.status(201).json({
+      message: 'User created successfully',
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        university: user.university,
+      },
+    });
+  } catch (error) {
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map((e) => e.message);
+      return res.status(400).json({ error: messages.join(', ') });
+    }
+    console.error('Create user error:', error);
+    return res.status(500).json({ error: 'User creation failed' });
+  }
+};
+
 module.exports = {
   register,
   login,
   logout,
   refresh,
+  createUser,
 };
