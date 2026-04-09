@@ -177,3 +177,64 @@ exports.withdrawApplication = async (req, res) => {
     res.status(400).json({ error: error.message });
   }
 };
+
+exports.acceptOffer = async (req, res) => {
+  try {
+    const application = await Application.findById(req.params.id);
+    if (!application) return res.status(404).json({ error: 'Application not found' });
+    if (application.applicant.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    if (application.status !== 'matched') {
+      return res.status(400).json({ error: 'Application is not in a matched state' });
+    }
+    if (application.offerStatus !== 'pending') {
+      return res.status(400).json({ error: `Offer is ${application.offerStatus}, cannot accept` });
+    }
+    if (application.offerExpiresAt && new Date() > application.offerExpiresAt) {
+      application.offerStatus = 'expired';
+      await application.save();
+      return res.status(400).json({ error: 'Offer window has expired' });
+    }
+
+    application.offerStatus = 'accepted';
+    await application.save();
+
+    res.json({ message: 'Offer accepted', application });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+exports.declineOffer = async (req, res) => {
+  try {
+    const Program = require('../models/Program');
+
+    const application = await Application.findById(req.params.id);
+    if (!application) return res.status(404).json({ error: 'Application not found' });
+    if (application.applicant.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    if (application.status !== 'matched') {
+      return res.status(400).json({ error: 'Application is not in a matched state' });
+    }
+    if (application.offerStatus !== 'pending') {
+      return res.status(400).json({ error: `Offer is ${application.offerStatus}, cannot decline` });
+    }
+
+    const matchedProgramId = application.matchedProgram;
+
+    application.offerStatus = 'declined';
+    application.status = 'unmatched';
+    application.matchedProgram = null;
+    await application.save();
+
+    if (matchedProgramId) {
+      await Program.findByIdAndUpdate(matchedProgramId, { $inc: { availableSeats: 1 } });
+    }
+
+    res.json({ message: 'Offer declined', application });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};

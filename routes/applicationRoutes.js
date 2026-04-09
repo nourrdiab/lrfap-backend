@@ -7,6 +7,8 @@ const {
   updateSelections,
   submitApplication,
   withdrawApplication,
+  acceptOffer,
+  declineOffer,
 } = require('../controllers/applicationController');
 
 const router = express.Router();
@@ -19,5 +21,7 @@ router.get('/:id', getApplication);
 router.put('/:id/selections', updateSelections);
 router.post('/:id/submit', submitApplication);
 router.post('/:id/withdraw', withdrawApplication);
+router.post('/:id/offer/accept', acceptOffer);
+router.post('/:id/offer/decline', declineOffer);
 
 module.exports = router;
