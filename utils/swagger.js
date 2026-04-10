@@ -44,7 +44,7 @@ const options = {
       { name: 'Notifications', description: 'In-portal notification center' },
       { name: 'System', description: 'Health and system endpoints' },
       { name: 'Documents', description: 'Document upload, download, and management' },
-      { name: 'Chatbot', description: 'AI-powered LRFAP assistant (Gemini)' },
+      { name: 'Chatbot', description: 'AI-powered LRFAP assistant (OpenAI GPT-4o-mini)' },
     ],
   },
   apis: ['./routes/*.js'],
