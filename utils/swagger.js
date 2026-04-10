@@ -43,6 +43,7 @@ const options = {
       { name: 'Dashboards', description: 'Aggregated metrics and counts' },
       { name: 'Notifications', description: 'In-portal notification center' },
       { name: 'System', description: 'Health and system endpoints' },
+      { name: 'Documents', description: 'Document upload, download, and management' },
     ],
   },
   apis: ['./routes/*.js'],

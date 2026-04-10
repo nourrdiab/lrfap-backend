@@ -21,6 +21,7 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./utils/swagger');
+const documentRoutes = require('./routes/documentRoutes');
 
 const app = express();
 
@@ -93,6 +94,7 @@ app.use('/api/match', matchRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/documents', documentRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({
