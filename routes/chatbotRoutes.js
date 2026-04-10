@@ -17,7 +17,7 @@ const chatbotLimiter = rateLimit({
  * /api/chatbot/ask:
  *   post:
  *     tags: [Chatbot]
- *     summary: Ask the LRFAP assistant a question (Gemini-powered, scope-restricted)
+ *     summary: Ask the LRFAP assistant a question (OpenAI-powered, scope-restricted)
  *     requestBody:
  *       required: true
  *       content:
