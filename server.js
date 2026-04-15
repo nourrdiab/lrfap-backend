@@ -74,8 +74,14 @@ app.use(async (req, res, next) => {
   }
 });
 
+// Swagger docs route — relaxed CSP to allow loading assets from cdnjs CDN
 app.use(
   '/api/docs',
+  (req, res, next) => {
+    res.removeHeader('Content-Security-Policy');
+    res.removeHeader('Content-Security-Policy-Report-Only');
+    next();
+  },
   helmet({
     contentSecurityPolicy: {
       directives: {
