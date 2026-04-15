@@ -74,15 +74,30 @@ app.use(async (req, res, next) => {
   }
 });
 
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customSiteTitle: 'LRFAP API Docs',
-  customCss: '.swagger-ui .topbar { display: none }',
-  customCssUrl: 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui.min.css',
-  customJs: [
-    'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui-bundle.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui-standalone-preset.js',
-  ],
-}));
+app.use(
+  '/api/docs',
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com'],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com'],
+        imgSrc: ["'self'", 'data:', 'https://cdnjs.cloudflare.com'],
+        fontSrc: ["'self'", 'https://cdnjs.cloudflare.com'],
+      },
+    },
+  }),
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    customSiteTitle: 'LRFAP API Docs',
+    customCss: '.swagger-ui .topbar { display: none }',
+    customCssUrl: 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui.min.css',
+    customJs: [
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui-bundle.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui-standalone-preset.js',
+    ],
+  })
+);
 
 app.get('/api/docs.json', (req, res) => {
   res.json(swaggerSpec);
