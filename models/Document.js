@@ -32,6 +32,22 @@ const documentSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    status: {
+      type: String,
+      enum: ['pending', 'verified', 'rejected', 'replacement_required'],
+      default: 'pending',
+    },
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    reviewedAt: {
+      type: Date,
+    },
+    reviewNotes: {
+      type: String,
+      trim: true,
+    },
   },
   { timestamps: true }
 );

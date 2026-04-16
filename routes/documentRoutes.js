@@ -7,6 +7,7 @@ const {
   getApplicationDocuments,
   getDocumentDownloadUrl,
   deleteDocument,
+  reviewDocument,
 } = require('../controllers/documentController');
 
 const router = express.Router();
@@ -102,5 +103,35 @@ router.get('/:id/download', getDocumentDownloadUrl);
  *       200: { description: Document deleted }
  */
 router.delete('/:id', authorize('applicant'), deleteDocument);
+
+/**
+ * @openapi
+ * /api/documents/{id}/status:
+ *   patch:
+ *     tags: [Documents]
+ *     summary: Review a document (university or LGC) - verify, reject, or require replacement
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status]
+ *             properties:
+ *               status: { type: string, enum: [verified, rejected, replacement_required] }
+ *               reviewNotes: { type: string }
+ *     responses:
+ *       200: { description: Document status updated }
+ *       403: { description: Not authorized to review this document }
+ *       404: { description: Document not found }
+ */
+router.patch('/:id/status', authorize('university', 'lgc'), reviewDocument);
 
 module.exports = router;

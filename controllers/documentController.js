@@ -1,6 +1,7 @@
 const multer = require('multer');
 const Document = require('../models/Document');
 const Application = require('../models/Application');
+const Program = require('../models/Program');
 const { uploadToR2, getDownloadUrl, deleteFromR2 } = require('../utils/r2');
 
 const ALLOWED_MIME_TYPES = [
@@ -138,6 +139,53 @@ exports.deleteDocument = async (req, res) => {
     await deleteFromR2(doc.r2Key);
     await doc.deleteOne();
     res.json({ message: 'Document deleted' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.reviewDocument = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, reviewNotes } = req.body;
+
+    const allowedStatuses = ['verified', 'rejected', 'replacement_required'];
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        error: `status must be one of: ${allowedStatuses.join(', ')}`,
+      });
+    }
+
+    const document = await Document.findById(id);
+    if (!document) return res.status(404).json({ error: 'Document not found' });
+    if (!document.application) {
+      return res.status(400).json({ error: 'Document is not linked to an application' });
+    }
+
+    if (req.user.role === 'university') {
+      const application = await Application.findById(document.application);
+      if (!application) return res.status(404).json({ error: 'Application not found' });
+
+      const programIds = application.selections.map((s) => s.program);
+      const matchingProgram = await Program.findOne({
+        _id: { $in: programIds },
+        university: req.user.university,
+      });
+
+      if (!matchingProgram) {
+        return res.status(403).json({
+          error: 'You can only review documents for applications that selected your programs',
+        });
+      }
+    }
+
+    document.status = status;
+    document.reviewedBy = req.user._id;
+    document.reviewedAt = new Date();
+    if (reviewNotes !== undefined) document.reviewNotes = reviewNotes;
+    await document.save();
+
+    res.json({ message: 'Document status updated', document });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
