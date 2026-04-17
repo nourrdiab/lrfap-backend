@@ -12,10 +12,21 @@ const documentSchema = new mongoose.Schema(
       ref: 'Application',
     },
     type: {
-      type: String,
-      enum: ['transcript', 'cv', 'recommendation_letter', 'id_document', 'medical_license', 'usmle_score', 'other'],
-      required: true,
-    },
+        type: String,
+        enum: [
+          'transcript',
+          'cv',
+          'recommendation_letter',
+          'id_document',
+          'medical_license',
+          'usmle_score',
+          'personal_statement',
+          'degree_certificate',
+          'language_test',
+          'other'
+        ],
+        required: true,
+      },
     r2Key: {
       type: String,
       required: true,
