@@ -200,6 +200,24 @@ exports.withdrawApplication = async (req, res) => {
   }
 };
 
+exports.deleteApplication = async (req, res) => {
+  try {
+    const application = await Application.findById(req.params.id);
+    if (!application) return res.status(404).json({ error: 'Application not found' });
+    if (application.applicant.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    if (application.status !== 'draft') {
+      return res.status(400).json({ error: 'Only drafts can be deleted' });
+    }
+    await application.deleteOne();
+    res.json({ message: 'Application deleted' });
+  } catch (error) {
+    console.error('deleteApplication error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
 exports.acceptOffer = async (req, res) => {
   try {
     const application = await Application.findById(req.params.id);

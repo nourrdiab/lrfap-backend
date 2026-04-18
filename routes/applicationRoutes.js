@@ -7,6 +7,7 @@ const {
   updateSelections,
   submitApplication,
   withdrawApplication,
+  deleteApplication,
   acceptOffer,
   declineOffer,
 } = require('../controllers/applicationController');
@@ -68,6 +69,27 @@ router.get('/', getMyApplications);
  *       200: { description: Application object }
  */
 router.get('/:id', getApplication);
+
+/**
+ * @openapi
+ * /api/applications/{id}:
+ *   delete:
+ *     tags: [Applications]
+ *     summary: Delete a draft application (applicant-owned, draft status only)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: Application deleted }
+ *       400: { description: Only drafts can be deleted }
+ *       403: { description: Forbidden - not the owner }
+ *       404: { description: Application not found }
+ */
+router.delete('/:id', deleteApplication);
 
 /**
  * @openapi
