@@ -24,10 +24,11 @@ exports.createApplication = async (req, res) => {
     const existing = await Application.findOne({
       applicant: req.user._id,
       cycle: cycleId,
-      track,
     });
     if (existing) {
-      return res.status(409).json({ error: 'Application already exists for this cycle and track' });
+      return res.status(409).json({
+        error: `You already have a ${existing.track} application for this cycle. Applicants may only apply to one track per cycle.`,
+      });
     }
 
     const application = await Application.create({
