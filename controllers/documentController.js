@@ -73,6 +73,7 @@ exports.getApplicationDocuments = async (req, res) => {
     });
     if (!application) return res.status(404).json({ error: 'Application not found' });
 
+    const isOwner = application.applicant.toString() === req.user._id.toString();
     const isLGC = req.user.role === 'lgc';
     let isAuthorizedUniversity = false;
 
@@ -82,7 +83,7 @@ exports.getApplicationDocuments = async (req, res) => {
       );
     }
 
-    if (!isLGC && !isAuthorizedUniversity) {
+    if (!isOwner && !isLGC && !isAuthorizedUniversity) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
