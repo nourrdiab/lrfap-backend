@@ -1,4 +1,5 @@
 const ApplicantProfile = require('../models/ApplicantProfile');
+const Application = require('../models/Application');
 
 const requiredForComplete = [
   'dateOfBirth', 'gender', 'nationality', 'phone',
@@ -27,6 +28,16 @@ exports.getMyProfile = async (req, res) => {
 
 exports.updateMyProfile = async (req, res) => {
   try {
+    const hasSubmittedApplication = await Application.exists({
+      applicant: req.user._id,
+      status: { $ne: 'draft' },
+    });
+    if (hasSubmittedApplication) {
+      return res.status(403).json({
+        error: 'Profile cannot be modified after application submission. Contact the LGC if contact information needs updating.',
+      });
+    }
+
     const { user, _id, createdAt, updatedAt, ...updates } = req.body;
 
     let profile = await ApplicantProfile.findOne({ user: req.user._id });
