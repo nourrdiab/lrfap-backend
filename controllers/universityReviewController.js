@@ -102,19 +102,26 @@ exports.getProgramRanking = async (req, res) => {
 
     const program = check.program;
 
-    let ranking = await ProgramRanking.findOne({ program: programId, cycle: program.cycle })
+    const ranking = await ProgramRanking.findOne({ program: programId, cycle: program.cycle })
       .populate('rankedApplicants.applicant', 'firstName lastName email')
       .populate('submittedBy', 'firstName lastName');
 
-    if (!ranking) {
-      ranking = await ProgramRanking.create({
-        program: programId,
-        cycle: program.cycle,
-        rankedApplicants: [],
-      });
+    if (ranking) {
+      return res.json(ranking);
     }
 
-    res.json(ranking);
+    // No document yet — return a synthetic empty draft instead of
+    // auto-creating a row on read. Creating on GET polluted the cycle
+    // with drafts the moment a reviewer previewed a program, which
+    // then blocked dev/demo bulk-submission flows. The synthetic shape
+    // omits `_id` (frontend type has it as optional) and matches what
+    // the DB row would look like on first PUT.
+    return res.json({
+      program: programId,
+      cycle: program.cycle,
+      rankedApplicants: [],
+      status: 'draft',
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

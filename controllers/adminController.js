@@ -55,6 +55,14 @@ exports.resetCycle = async (req, res) => {
 
     const matchRunResult = await MatchRun.deleteMany({ cycle: cycleId });
 
+    // Delete every ProgramRanking for this cycle — both drafts and
+    // submitted. Drafts come from the legacy `getProgramRanking`
+    // auto-create side effect plus any real reviewer drafts, and
+    // submitted rankings are stale once applications reset. Leaving
+    // them behind was the root cause of bulk-submit silently skipping
+    // programs on subsequent demo runs.
+    const rankingResult = await ProgramRanking.deleteMany({ cycle: cycleId });
+
     // Aggregation-pipeline update so we can reference the document's own
     // `capacity` field when rewriting `availableSeats`. Mongoose 9.x
     // requires the explicit `updatePipeline: true` opt-in to accept an
@@ -76,6 +84,7 @@ exports.resetCycle = async (req, res) => {
     return res.status(200).json({
       applicationsReset: applicationResult.modifiedCount ?? 0,
       matchRunsDeleted: matchRunResult.deletedCount ?? 0,
+      rankingsDeleted: rankingResult.deletedCount ?? 0,
       programsReset: programResult.modifiedCount ?? 0,
       cycleStatusReset,
       message: 'Cycle reset to pre-matching state',
@@ -153,9 +162,15 @@ exports.bulkSubmitRankings = async (req, res) => {
       (r) => r.status === 'submitted'
     ).length;
 
+    // Match the matching algorithm's view of applicants exactly — it
+    // only uses status='submitted'. Including 'under_review' here
+    // produced rankings for programs that matching would silently skip
+    // (because those applicants aren't visible to the algorithm),
+    // which caused bulk-submit's numbers to disagree with the Matching
+    // page readiness indicator.
     const apps = await Application.find({
       cycle: cycleId,
-      status: { $in: ['submitted', 'under_review'] },
+      status: 'submitted',
     }).select('_id applicant submittedAt selections');
 
     const now = new Date();
