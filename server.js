@@ -23,6 +23,8 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./utils/swagger');
 const documentRoutes = require('./routes/documentRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
+// TODO: Remove this import before production deployment. Dev/demo reset only.
+const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 
@@ -123,6 +125,8 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+// TODO: Remove this route before production deployment. Dev/demo reset only.
+app.use('/api/admin', adminRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({
