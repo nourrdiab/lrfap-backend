@@ -12,6 +12,7 @@ const Application = require('../models/Application');
 const Cycle = require('../models/Cycle');
 const MatchRun = require('../models/MatchRun');
 const Program = require('../models/Program');
+const ProgramRanking = require('../models/ProgramRanking');
 
 /**
  * POST /api/admin/reset-cycle/:cycleId
@@ -81,6 +82,118 @@ exports.resetCycle = async (req, res) => {
     });
   } catch (error) {
     console.error('Reset cycle error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * POST /api/admin/bulk-submit-rankings/:cycleId
+ *
+ * For each program in the cycle that doesn't already have a
+ * ProgramRanking document, create one with status='submitted' and
+ * rankedApplicants built from the applications that selected that
+ * program (sorted by submittedAt ASC). Programs with an existing
+ * ranking (draft OR submitted) are left alone.
+ *
+ * Four DB round trips regardless of program count:
+ *   1. Program.find
+ *   2. ProgramRanking.find (existing for cycle)
+ *   3. Application.find (all visible apps for cycle)
+ *   4. ProgramRanking.insertMany (batched)
+ *
+ * If some programs already have DRAFT rankings and you need them
+ * promoted to submitted, this endpoint won't help — matches spec. Ask
+ * to expand if that's blocking matching.
+ */
+exports.bulkSubmitRankings = async (req, res) => {
+  try {
+    const { cycleId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(cycleId)) {
+      return res.status(400).json({ error: 'Invalid cycle ID' });
+    }
+    const cycle = await Cycle.findById(cycleId).select('_id');
+    if (!cycle) {
+      return res.status(404).json({ error: 'Cycle not found' });
+    }
+
+    const programs = await Program.find({
+      cycle: cycleId,
+      isActive: true,
+    }).select('_id');
+
+    if (programs.length === 0) {
+      return res.status(200).json({
+        programsProcessed: 0,
+        rankingsCreated: 0,
+        rankingsSubmitted: 0,
+        message: 'No programs in this cycle',
+      });
+    }
+
+    const programIds = programs.map((p) => p._id);
+
+    const existingRankings = await ProgramRanking.find({
+      cycle: cycleId,
+      program: { $in: programIds },
+    }).select('program status');
+    const existingByProgram = new Map(
+      existingRankings.map((r) => [r.program.toString(), r])
+    );
+    const preExistingSubmitted = existingRankings.filter(
+      (r) => r.status === 'submitted'
+    ).length;
+
+    const apps = await Application.find({
+      cycle: cycleId,
+      status: { $in: ['submitted', 'under_review'] },
+    }).select('_id applicant submittedAt selections');
+
+    const now = new Date();
+    const docsToInsert = [];
+
+    for (const program of programs) {
+      if (existingByProgram.has(program._id.toString())) continue;
+
+      const programApps = apps
+        .filter((app) =>
+          app.selections.some(
+            (s) => s.program.toString() === program._id.toString()
+          )
+        )
+        .sort((a, b) => {
+          const ta = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
+          const tb = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
+          return ta - tb;
+        });
+
+      docsToInsert.push({
+        program: program._id,
+        cycle: cycleId,
+        rankedApplicants: programApps.map((app, i) => ({
+          applicant: app.applicant,
+          application: app._id,
+          rank: i + 1,
+        })),
+        status: 'submitted',
+        submittedAt: now,
+        submittedBy: req.user._id,
+      });
+    }
+
+    let rankingsCreated = 0;
+    if (docsToInsert.length > 0) {
+      const inserted = await ProgramRanking.insertMany(docsToInsert);
+      rankingsCreated = inserted.length;
+    }
+
+    return res.status(200).json({
+      programsProcessed: programs.length,
+      rankingsCreated,
+      rankingsSubmitted: preExistingSubmitted + rankingsCreated,
+      message: 'Bulk ranking submission complete',
+    });
+  } catch (error) {
+    console.error('Bulk submit rankings error:', error);
     return res.status(500).json({ error: error.message });
   }
 };
