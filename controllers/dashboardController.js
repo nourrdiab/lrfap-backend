@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Application = require('../models/Application');
 const Program = require('../models/Program');
@@ -99,6 +100,358 @@ exports.getLGCDashboard = async (req, res) => {
     });
   } catch (error) {
     console.error('LGC dashboard error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * GET /api/dashboard/lgc/ranking-summary?cycle=<id>
+ *
+ * Collapses the frontend's old N+1 (one ranking fetch per program) into
+ * a single aggregation. Returns per-university ranking completion stats
+ * scoped to one cycle, plus rollups by track and overall totals.
+ *
+ * Deliberately does NOT auto-create missing ProgramRanking docs — the
+ * aggregation infers 'draft' for programs with no ranking document, so
+ * the list endpoint becomes side-effect-free (unlike the per-program
+ * getProgramRanking controller which creates drafts on read).
+ *
+ * Universities with zero programs in this cycle are omitted; the
+ * frontend merges them in from its own universities list.
+ */
+exports.getLGCRankingSummary = async (req, res) => {
+  try {
+    const cycleParam = req.query.cycle;
+    if (!cycleParam) {
+      return res.status(400).json({ error: 'cycle parameter is required' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(cycleParam)) {
+      return res.status(400).json({ error: 'Invalid cycle ID' });
+    }
+    const cycleId = new mongoose.Types.ObjectId(cycleParam);
+
+    const cycle = await Cycle.findById(cycleId).select('_id');
+    if (!cycle) {
+      return res.status(404).json({ error: 'Cycle not found' });
+    }
+
+    const [facet] = await Program.aggregate([
+      { $match: { cycle: cycleId, isActive: true } },
+      {
+        $lookup: {
+          from: 'programrankings',
+          let: { programId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                cycle: cycleId,
+                $expr: { $eq: ['$program', '$$programId'] },
+              },
+            },
+            { $project: { status: 1, updatedAt: 1 } },
+          ],
+          as: 'ranking',
+        },
+      },
+      {
+        $addFields: {
+          rankingStatus: {
+            $ifNull: [{ $arrayElemAt: ['$ranking.status', 0] }, 'draft'],
+          },
+        },
+      },
+      {
+        $facet: {
+          perUniversity: [
+            {
+              $group: {
+                _id: '$university',
+                totalPrograms: { $sum: 1 },
+                submittedRankings: {
+                  $sum: {
+                    $cond: [{ $eq: ['$rankingStatus', 'submitted'] }, 1, 0],
+                  },
+                },
+                residencyTotal: {
+                  $sum: { $cond: [{ $eq: ['$track', 'residency'] }, 1, 0] },
+                },
+                residencySubmitted: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          { $eq: ['$track', 'residency'] },
+                          { $eq: ['$rankingStatus', 'submitted'] },
+                        ],
+                      },
+                      1,
+                      0,
+                    ],
+                  },
+                },
+                fellowshipTotal: {
+                  $sum: { $cond: [{ $eq: ['$track', 'fellowship'] }, 1, 0] },
+                },
+                fellowshipSubmitted: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          { $eq: ['$track', 'fellowship'] },
+                          { $eq: ['$rankingStatus', 'submitted'] },
+                        ],
+                      },
+                      1,
+                      0,
+                    ],
+                  },
+                },
+                lastUpdatedAt: { $max: '$updatedAt' },
+              },
+            },
+            {
+              $lookup: {
+                from: 'universities',
+                localField: '_id',
+                foreignField: '_id',
+                as: 'uni',
+              },
+            },
+            { $unwind: '$uni' },
+            {
+              $project: {
+                _id: 1,
+                name: '$uni.name',
+                code: '$uni.code',
+                totalPrograms: 1,
+                submittedRankings: 1,
+                tracks: {
+                  residency: {
+                    totalPrograms: '$residencyTotal',
+                    submittedRankings: '$residencySubmitted',
+                  },
+                  fellowship: {
+                    totalPrograms: '$fellowshipTotal',
+                    submittedRankings: '$fellowshipSubmitted',
+                  },
+                },
+                lastUpdatedAt: 1,
+              },
+            },
+            { $sort: { name: 1 } },
+          ],
+          totals: [
+            {
+              $group: {
+                _id: null,
+                programs: { $sum: 1 },
+                submittedRankings: {
+                  $sum: {
+                    $cond: [{ $eq: ['$rankingStatus', 'submitted'] }, 1, 0],
+                  },
+                },
+                residencyTotal: {
+                  $sum: { $cond: [{ $eq: ['$track', 'residency'] }, 1, 0] },
+                },
+                residencySubmitted: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          { $eq: ['$track', 'residency'] },
+                          { $eq: ['$rankingStatus', 'submitted'] },
+                        ],
+                      },
+                      1,
+                      0,
+                    ],
+                  },
+                },
+                fellowshipTotal: {
+                  $sum: { $cond: [{ $eq: ['$track', 'fellowship'] }, 1, 0] },
+                },
+                fellowshipSubmitted: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          { $eq: ['$track', 'fellowship'] },
+                          { $eq: ['$rankingStatus', 'submitted'] },
+                        ],
+                      },
+                      1,
+                      0,
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    const totals = facet?.totals?.[0] || {
+      programs: 0,
+      submittedRankings: 0,
+      residencyTotal: 0,
+      residencySubmitted: 0,
+      fellowshipTotal: 0,
+      fellowshipSubmitted: 0,
+    };
+
+    res.json({
+      cycleId: cycleId.toString(),
+      totals: {
+        programs: totals.programs,
+        submittedRankings: totals.submittedRankings,
+        draftRankings: totals.programs - totals.submittedRankings,
+      },
+      tracks: {
+        residency: {
+          totalPrograms: totals.residencyTotal,
+          submittedRankings: totals.residencySubmitted,
+        },
+        fellowship: {
+          totalPrograms: totals.fellowshipTotal,
+          submittedRankings: totals.fellowshipSubmitted,
+        },
+      },
+      universities: facet?.perUniversity ?? [],
+    });
+  } catch (error) {
+    console.error('LGC ranking summary error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * GET /api/dashboard/university/program-counts?cycle=<id>
+ *
+ * Per-program applicant status counts for the authenticated university's
+ * programs in a given cycle, plus total unique applicants across all of
+ * those programs. Replaces the old per-program application fetch loop on
+ * the University dashboard.
+ *
+ * Draft applications are excluded to match the rest of the university
+ * portal (reviewers never see drafts).
+ */
+exports.getUniversityProgramCounts = async (req, res) => {
+  try {
+    const cycleParam = req.query.cycle;
+    if (!cycleParam) {
+      return res.status(400).json({ error: 'cycle parameter is required' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(cycleParam)) {
+      return res.status(400).json({ error: 'Invalid cycle ID' });
+    }
+    const cycleId = new mongoose.Types.ObjectId(cycleParam);
+
+    const cycle = await Cycle.findById(cycleId).select('_id');
+    if (!cycle) {
+      return res.status(404).json({ error: 'Cycle not found' });
+    }
+
+    const universityId = req.user.university;
+    if (!universityId) {
+      return res
+        .status(400)
+        .json({ error: 'Authenticated user is not associated with a university' });
+    }
+
+    const programIds = await Program.find({
+      university: universityId,
+      cycle: cycleId,
+      isActive: true,
+    }).distinct('_id');
+
+    if (programIds.length === 0) {
+      return res.json({
+        universityId: universityId.toString(),
+        cycleId: cycleId.toString(),
+        totalUniqueApplicants: 0,
+        programs: [],
+      });
+    }
+
+    const VISIBLE_STATUSES = [
+      'submitted',
+      'under_review',
+      'matched',
+      'unmatched',
+      'withdrawn',
+    ];
+
+    const [facet] = await Application.aggregate([
+      {
+        $match: {
+          cycle: cycleId,
+          'selections.program': { $in: programIds },
+          status: { $in: VISIBLE_STATUSES },
+        },
+      },
+      { $unwind: '$selections' },
+      { $match: { 'selections.program': { $in: programIds } } },
+      {
+        $facet: {
+          perProgram: [
+            {
+              $group: {
+                _id: { program: '$selections.program', status: '$status' },
+                count: { $sum: 1 },
+              },
+            },
+            {
+              $group: {
+                _id: '$_id.program',
+                statuses: {
+                  $push: { status: '$_id.status', count: '$count' },
+                },
+              },
+            },
+          ],
+          uniqueApplicants: [
+            { $group: { _id: '$applicant' } },
+            { $count: 'total' },
+          ],
+        },
+      },
+    ]);
+
+    const emptyCounts = () => ({
+      submitted: 0,
+      under_review: 0,
+      matched: 0,
+      unmatched: 0,
+      withdrawn: 0,
+      total: 0,
+    });
+
+    const countsByProgram = new Map();
+    for (const row of facet?.perProgram ?? []) {
+      const counts = emptyCounts();
+      for (const entry of row.statuses) {
+        if (counts[entry.status] !== undefined) {
+          counts[entry.status] = entry.count;
+          counts.total += entry.count;
+        }
+      }
+      countsByProgram.set(row._id.toString(), counts);
+    }
+
+    const programs = programIds.map((id) => ({
+      programId: id.toString(),
+      counts: countsByProgram.get(id.toString()) ?? emptyCounts(),
+    }));
+
+    res.json({
+      universityId: universityId.toString(),
+      cycleId: cycleId.toString(),
+      totalUniqueApplicants: facet?.uniqueApplicants?.[0]?.total ?? 0,
+      programs,
+    });
+  } catch (error) {
+    console.error('University program counts error:', error);
     res.status(500).json({ error: error.message });
   }
 };

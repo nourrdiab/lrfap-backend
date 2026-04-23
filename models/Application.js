@@ -80,6 +80,10 @@ const applicationSchema = new mongoose.Schema(
 );
 
 applicationSchema.index({ applicant: 1, cycle: 1, track: 1 }, { unique: true });
+// Dashboard aggregations filter + unwind on `selections.program`; without
+// this index that becomes a collection scan on a busy dataset. See
+// dashboardController.getUniversityProgramCounts.
+applicationSchema.index({ 'selections.program': 1 });
 
 applicationSchema.pre('validate', function () {
   if (this.selections && this.selections.length > 0) {
