@@ -135,6 +135,20 @@ exports.getLGCRankingSummary = async (req, res) => {
       return res.status(404).json({ error: 'Cycle not found' });
     }
 
+    // Pre-query: which programs in this cycle have ≥ 1 submitted
+    // applicant? Matching uses only status='submitted' applications
+    // (see matchController.gatherInputs), so the readiness denominator
+    // should mirror that filter. Programs without applicants can't
+    // match anyone even if unranked — the frontend uses this set to
+    // show "X of Y programs-with-applicants ranked" instead of gating
+    // on every program in the cycle.
+    const appPrograms = await Application.aggregate([
+      { $match: { cycle: cycleId, status: 'submitted' } },
+      { $unwind: '$selections' },
+      { $group: { _id: '$selections.program' } },
+    ]);
+    const programsWithApplicantsIds = appPrograms.map((r) => r._id);
+
     const [facet] = await Program.aggregate([
       { $match: { cycle: cycleId, isActive: true } },
       {
@@ -157,6 +171,9 @@ exports.getLGCRankingSummary = async (req, res) => {
         $addFields: {
           rankingStatus: {
             $ifNull: [{ $arrayElemAt: ['$ranking.status', 0] }, 'draft'],
+          },
+          hasApplicants: {
+            $in: ['$_id', programsWithApplicantsIds],
           },
         },
       },
@@ -267,6 +284,35 @@ exports.getLGCRankingSummary = async (req, res) => {
                     ],
                   },
                 },
+                residencyWithApplicants: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          { $eq: ['$track', 'residency'] },
+                          '$hasApplicants',
+                        ],
+                      },
+                      1,
+                      0,
+                    ],
+                  },
+                },
+                residencyWithApplicantsAndSubmitted: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          { $eq: ['$track', 'residency'] },
+                          '$hasApplicants',
+                          { $eq: ['$rankingStatus', 'submitted'] },
+                        ],
+                      },
+                      1,
+                      0,
+                    ],
+                  },
+                },
                 fellowshipTotal: {
                   $sum: { $cond: [{ $eq: ['$track', 'fellowship'] }, 1, 0] },
                 },
@@ -276,6 +322,35 @@ exports.getLGCRankingSummary = async (req, res) => {
                       {
                         $and: [
                           { $eq: ['$track', 'fellowship'] },
+                          { $eq: ['$rankingStatus', 'submitted'] },
+                        ],
+                      },
+                      1,
+                      0,
+                    ],
+                  },
+                },
+                fellowshipWithApplicants: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          { $eq: ['$track', 'fellowship'] },
+                          '$hasApplicants',
+                        ],
+                      },
+                      1,
+                      0,
+                    ],
+                  },
+                },
+                fellowshipWithApplicantsAndSubmitted: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          { $eq: ['$track', 'fellowship'] },
+                          '$hasApplicants',
                           { $eq: ['$rankingStatus', 'submitted'] },
                         ],
                       },
@@ -296,8 +371,12 @@ exports.getLGCRankingSummary = async (req, res) => {
       submittedRankings: 0,
       residencyTotal: 0,
       residencySubmitted: 0,
+      residencyWithApplicants: 0,
+      residencyWithApplicantsAndSubmitted: 0,
       fellowshipTotal: 0,
       fellowshipSubmitted: 0,
+      fellowshipWithApplicants: 0,
+      fellowshipWithApplicantsAndSubmitted: 0,
     };
 
     res.json({
@@ -311,10 +390,16 @@ exports.getLGCRankingSummary = async (req, res) => {
         residency: {
           totalPrograms: totals.residencyTotal,
           submittedRankings: totals.residencySubmitted,
+          programsWithApplicants: totals.residencyWithApplicants,
+          programsWithApplicantsAndSubmittedRanking:
+            totals.residencyWithApplicantsAndSubmitted,
         },
         fellowship: {
           totalPrograms: totals.fellowshipTotal,
           submittedRankings: totals.fellowshipSubmitted,
+          programsWithApplicants: totals.fellowshipWithApplicants,
+          programsWithApplicantsAndSubmittedRanking:
+            totals.fellowshipWithApplicantsAndSubmitted,
         },
       },
       universities: facet?.perUniversity ?? [],

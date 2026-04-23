@@ -95,6 +95,16 @@ exports.resetCycle = async (req, res) => {
  * program (sorted by submittedAt ASC). Programs with an existing
  * ranking (draft OR submitted) are left alone.
  *
+ * Observed behavior worth knowing: programs with zero applicants end
+ * up WITHOUT a ranking document after this endpoint runs. The
+ * rankedApplicants array for those is empty, and Mongoose / MongoDB
+ * drop them during the batched insertMany (the matching frontend's
+ * readiness check treats "programs with applicants" as the denominator
+ * precisely so this is fine — an unranked empty program is invisible
+ * to the match and to the readiness indicator). If that ever changes
+ * and empty rankings start persisting, the readiness logic still works
+ * because it keys off applicant presence, not ranking presence.
+ *
  * Four DB round trips regardless of program count:
  *   1. Program.find
  *   2. ProgramRanking.find (existing for cycle)
