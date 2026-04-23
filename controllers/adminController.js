@@ -55,11 +55,15 @@ exports.resetCycle = async (req, res) => {
     const matchRunResult = await MatchRun.deleteMany({ cycle: cycleId });
 
     // Aggregation-pipeline update so we can reference the document's own
-    // `capacity` field when rewriting `availableSeats`. Mongoose passes
-    // pipeline-array updates straight through to MongoDB.
-    const programResult = await Program.updateMany({ cycle: cycleId }, [
-      { $set: { availableSeats: '$capacity' } },
-    ]);
+    // `capacity` field when rewriting `availableSeats`. Mongoose 9.x
+    // requires the explicit `updatePipeline: true` opt-in to accept an
+    // array update — without it, query.js throws "Cannot pass an array
+    // to query updates unless the `updatePipeline` option is set."
+    const programResult = await Program.updateMany(
+      { cycle: cycleId },
+      [{ $set: { availableSeats: '$capacity' } }],
+      { updatePipeline: true }
+    );
 
     let cycleStatusReset = false;
     if (cycle.status === 'matching' || cycle.status === 'published') {
