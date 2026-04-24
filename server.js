@@ -47,9 +47,32 @@ const connectDB = () => {
 
 app.use(helmet());
 
+// CORS allowlist. `CORS_ORIGIN` is a comma-separated list of exact
+// origins (e.g. "https://lrfap-frontend.vercel.app,http://localhost:5173").
+// When CORS_ALLOW_VERCEL_PREVIEWS=1, any *.vercel.app origin is also
+// accepted — handy for branch/preview deploys without having to
+// redeploy the backend every time the preview URL changes.
+//
+// Requests with no Origin header (server-to-server, curl, same-origin)
+// are allowed through. Unlisted browser origins get a CORS error,
+// which is what we want — credentials: true means we can't wildcard.
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+const ALLOW_VERCEL_PREVIEWS = process.env.CORS_ALLOW_VERCEL_PREVIEWS === '1';
+const VERCEL_PREVIEW_RE = /^https:\/\/[a-z0-9-]+\.vercel\.app$/i;
+
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    origin(origin, callback) {
+      if (!origin) return callback(null, true);
+      if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+      if (ALLOW_VERCEL_PREVIEWS && VERCEL_PREVIEW_RE.test(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS: origin ${origin} not allowed`));
+    },
     credentials: true,
   })
 );
