@@ -14,6 +14,30 @@ const ensureProgramBelongsToUser = async (programId, user) => {
   return { program };
 };
 
+// Strip preference-revealing data from an application before returning it
+// to a university reviewer: keep only selections whose program belongs to
+// the reviewer's university, and remove the applicant's rank for each.
+// The matching algorithm is stable only if neither side knows the other's
+// rankings; the reviewer learns nothing here that they didn't know already
+// (they can already see that the applicant chose at least one of their
+// programs — that's why this application is in their review queue).
+const sanitizeForUniversityReview = (application, viewerUniversityId) => {
+  const obj = application.toObject ? application.toObject() : { ...application };
+  if (Array.isArray(obj.selections)) {
+    const myUniId = viewerUniversityId.toString();
+    obj.selections = obj.selections
+      .filter((s) => {
+        const programUni = s.program?.university?._id || s.program?.university;
+        return programUni && programUni.toString() === myUniId;
+      })
+      .map((s) => {
+        const { rank, ...rest } = s;
+        return rest;
+      });
+  }
+  return obj;
+};
+
 exports.getMyPrograms = async (req, res) => {
   try {
     const filter = { isActive: true };
@@ -47,7 +71,7 @@ exports.getProgramApplications = async (req, res) => {
       .populate('cycle', 'name year')
       .populate({
         path: 'selections.program',
-        select: 'track',
+        select: 'track university',
       });
 
     if (search) {
@@ -58,7 +82,13 @@ exports.getProgramApplications = async (req, res) => {
       });
     }
 
-    res.json(applications);
+    if (req.user.role === 'lgc') {
+      return res.json(applications);
+    }
+    const sanitized = applications.map((app) =>
+      sanitizeForUniversityReview(app, req.user.university)
+    );
+    res.json(sanitized);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -90,6 +120,7 @@ exports.getApplicationDetail = async (req, res) => {
       if (!belongsToUniversity) {
         return res.status(403).json({ error: 'Forbidden' });
       }
+      return res.json(sanitizeForUniversityReview(application, req.user.university));
     }
 
     res.json(application);
