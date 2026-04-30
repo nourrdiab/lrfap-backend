@@ -1,6 +1,7 @@
 const Application = require('../models/Application');
 const Program = require('../models/Program');
 const ProgramRanking = require('../models/ProgramRanking');
+const ApplicationReviewState = require('../models/ApplicationReviewState');
 const Cycle = require('../models/Cycle');
 const { logAction } = require('../utils/audit');
 const { notify } = require('../utils/notify');
@@ -12,6 +13,22 @@ const ensureProgramBelongsToUser = async (programId, user) => {
     return { error: 'Forbidden: program does not belong to your institution', status: 403 };
   }
   return { program };
+};
+
+const ensureApplicationBelongsToUniversity = async (applicationId, user) => {
+  const application = await Application.findById(applicationId).populate({
+    path: 'selections.program',
+    select: 'university',
+  });
+  if (!application) return { error: 'Application not found', status: 404 };
+  if (user.role === 'lgc') return { application };
+  if (!user.university) return { error: 'Forbidden', status: 403 };
+  const myUniId = user.university.toString();
+  const belongs = application.selections.some(
+    (s) => s.program?.university?.toString() === myUniId
+  );
+  if (!belongs) return { error: 'Forbidden', status: 403 };
+  return { application };
 };
 
 // Strip preference-revealing data from an application before returning it
@@ -83,11 +100,21 @@ exports.getProgramApplications = async (req, res) => {
     }
 
     if (req.user.role === 'lgc') {
-      return res.json(applications);
+      return res.json(applications.map((app) => app.toObject()));
     }
-    const sanitized = applications.map((app) =>
-      sanitizeForUniversityReview(app, req.user.university)
+    const appIds = applications.map((a) => a._id);
+    const reviewStates = await ApplicationReviewState.find({
+      application: { $in: appIds },
+      university: req.user.university,
+    });
+    const stateByApp = new Map(
+      reviewStates.map((r) => [r.application.toString(), r.state])
     );
+    const sanitized = applications.map((app) => {
+      const obj = sanitizeForUniversityReview(app, req.user.university);
+      obj.reviewState = stateByApp.get(app._id.toString()) || 'new';
+      return obj;
+    });
     res.json(sanitized);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -120,7 +147,13 @@ exports.getApplicationDetail = async (req, res) => {
       if (!belongsToUniversity) {
         return res.status(403).json({ error: 'Forbidden' });
       }
-      return res.json(sanitizeForUniversityReview(application, req.user.university));
+      const obj = sanitizeForUniversityReview(application, req.user.university);
+      const rs = await ApplicationReviewState.findOne({
+        application: application._id,
+        university: req.user.university,
+      });
+      obj.reviewState = rs?.state || 'new';
+      return res.json(obj);
     }
 
     res.json(application);
@@ -258,5 +291,53 @@ exports.submitProgramRanking = async (req, res) => {
     res.json({ message: 'Ranking submitted successfully', ranking });
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+};
+
+exports.beginReview = async (req, res) => {
+  try {
+    if (req.user.role !== 'university') {
+      return res
+        .status(403)
+        .json({ error: 'Only university reviewers can transition review state' });
+    }
+    const check = await ensureApplicationBelongsToUniversity(
+      req.params.applicationId,
+      req.user
+    );
+    if (check.error) return res.status(check.status).json({ error: check.error });
+
+    const reviewState = await ApplicationReviewState.findOneAndUpdate(
+      { application: req.params.applicationId, university: req.user.university },
+      { state: 'under_review', updatedBy: req.user._id },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    res.json({ state: reviewState.state, updatedAt: reviewState.updatedAt });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.markReviewed = async (req, res) => {
+  try {
+    if (req.user.role !== 'university') {
+      return res
+        .status(403)
+        .json({ error: 'Only university reviewers can transition review state' });
+    }
+    const check = await ensureApplicationBelongsToUniversity(
+      req.params.applicationId,
+      req.user
+    );
+    if (check.error) return res.status(check.status).json({ error: check.error });
+
+    const reviewState = await ApplicationReviewState.findOneAndUpdate(
+      { application: req.params.applicationId, university: req.user.university },
+      { state: 'reviewed', updatedBy: req.user._id },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    res.json({ state: reviewState.state, updatedAt: reviewState.updatedAt });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };

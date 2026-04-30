@@ -4,6 +4,7 @@ const Program = require('../models/Program');
 const Cycle = require('../models/Cycle');
 const MatchRun = require('../models/MatchRun');
 const Notification = require('../models/Notification');
+const ApplicationReviewState = require('../models/ApplicationReviewState');
 const { runGaleShapley } = require('../utils/matching');
 const { logAction } = require('../utils/audit');
 const { sendEmail, matchPublishedTemplate, matchUnmatchedTemplate } = require('../utils/email');
@@ -141,7 +142,7 @@ exports.executeMatch = async (req, res) => {
       return res.status(400).json({ error: 'An official match run already exists for this cycle and track' });
     }
 
-    const { applicantsInput, programsInput, submittedApplications } = await gatherInputs(cycleId, track);
+    const { applicantsInput, programsInput, submittedApplications, programs } = await gatherInputs(cycleId, track);
 
     if (applicantsInput.length === 0) {
       return res.status(400).json({ error: 'No submitted applications for this cycle and track' });
@@ -149,6 +150,10 @@ exports.executeMatch = async (req, res) => {
     if (programsInput.length === 0) {
       return res.status(400).json({ error: 'No programs with submitted rankings for this cycle and track' });
     }
+
+    const programUniMap = new Map(
+      programs.map((p) => [p._id.toString(), p.university.toString()])
+    );
 
     const matchRun = await MatchRun.create({
       cycle: cycleId,
@@ -179,6 +184,14 @@ exports.executeMatch = async (req, res) => {
         app.matchedProgram = matched;
         app.offerStatus = 'pending';
         app.offerExpiresAt = new Date(Date.now() + cycle.acceptanceWindowHours * 60 * 60 * 1000);
+        const matchedUniId = programUniMap.get(matched);
+        if (matchedUniId) {
+          await ApplicationReviewState.findOneAndUpdate(
+            { application: app._id, university: matchedUniId },
+            { state: 'matched' },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+          );
+        }
       } else {
         app.status = 'unmatched';
       }

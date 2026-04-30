@@ -6,6 +6,7 @@ const {
   getMyDocuments,
   getApplicationDocuments,
   getDocumentDownloadUrl,
+  getDocumentViewUrl,
   deleteDocument,
   reviewDocument,
 } = require('../controllers/documentController');
@@ -85,6 +86,24 @@ router.get('/application/:applicationId', getApplicationDocuments);
  *       200: { description: Signed URL returned }
  */
 router.get('/:id/download', getDocumentDownloadUrl);
+
+/**
+ * @openapi
+ * /api/documents/{id}/view:
+ *   get:
+ *     tags: [Documents]
+ *     summary: Get a signed URL that opens inline in the browser (1-hour expiry)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: Signed URL returned }
+ */
+router.get('/:id/view', getDocumentViewUrl);
 
 /**
  * @openapi

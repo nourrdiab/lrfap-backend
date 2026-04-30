@@ -98,7 +98,7 @@ exports.getApplicationDocuments = async (req, res) => {
   }
 };
 
-exports.getDocumentDownloadUrl = async (req, res) => {
+async function generateDocumentSignedUrl(req, res, disposition) {
   try {
     const doc = await Document.findById(req.params.id);
     if (!doc) return res.status(404).json({ error: 'Document not found' });
@@ -123,12 +123,21 @@ exports.getDocumentDownloadUrl = async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const url = await getDownloadUrl(doc.r2Key, 3600);
+    const url = await getDownloadUrl(doc.r2Key, 3600, {
+      disposition,
+      filename: doc.originalName,
+    });
     res.json({ url, expiresIn: 3600, document: doc });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
-};
+}
+
+exports.getDocumentDownloadUrl = (req, res) =>
+  generateDocumentSignedUrl(req, res, 'attachment');
+
+exports.getDocumentViewUrl = (req, res) =>
+  generateDocumentSignedUrl(req, res, 'inline');
 
 exports.deleteDocument = async (req, res) => {
   try {

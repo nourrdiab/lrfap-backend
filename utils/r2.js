@@ -30,8 +30,15 @@ const uploadToR2 = async ({ buffer, mimeType, folder = 'documents', originalName
   return { key, originalName, mimeType, size: buffer.length };
 };
 
-const getDownloadUrl = async (key, expiresInSeconds = 3600) => {
-  const command = new GetObjectCommand({ Bucket: BUCKET, Key: key });
+const getDownloadUrl = async (key, expiresInSeconds = 3600, options = {}) => {
+  const params = { Bucket: BUCKET, Key: key };
+  if (options.disposition === 'attachment') {
+    const safeName = (options.filename || 'download').replace(/"/g, '');
+    params.ResponseContentDisposition = `attachment; filename="${safeName}"`;
+  } else if (options.disposition === 'inline') {
+    params.ResponseContentDisposition = 'inline';
+  }
+  const command = new GetObjectCommand(params);
   return getSignedUrl(r2Client, command, { expiresIn: expiresInSeconds });
 };
 

@@ -7,6 +7,8 @@ const {
   getProgramRanking,
   updateProgramRanking,
   submitProgramRanking,
+  beginReview,
+  markReviewed,
 } = require('../controllers/universityReviewController');
 
 const router = express.Router();
@@ -67,6 +69,42 @@ router.get('/programs/:programId/applications', getProgramApplications);
  *       200: { description: Application object }
  */
 router.get('/applications/:applicationId', getApplicationDetail);
+
+/**
+ * @openapi
+ * /api/university-review/applications/{applicationId}/begin-review:
+ *   post:
+ *     tags: [University Review]
+ *     summary: Mark an application as under review for the caller's university
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: applicationId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: Updated review state }
+ */
+router.post('/applications/:applicationId/begin-review', beginReview);
+
+/**
+ * @openapi
+ * /api/university-review/applications/{applicationId}/mark-reviewed:
+ *   post:
+ *     tags: [University Review]
+ *     summary: Mark an application as reviewed for the caller's university
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: applicationId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: Updated review state }
+ */
+router.post('/applications/:applicationId/mark-reviewed', markReviewed);
 
 /**
  * @openapi
