@@ -52,7 +52,7 @@ Each cycle has key dates managed by the LGC, including the application submissio
 Specific dates for the 2026 cycle are not part of this knowledge base. If you are signed in as an applicant, the dates that apply to you are visible in your dashboard. For confirmation of specific deadlines, contact the LGC directly through the support page on the LRFAP website.
 
 ## Eligibility
-Applicants must be medical school graduates from recognized institutions. Some programs have additional requirements. For example, all programs at Saint Joseph University of Beirut require French language proficiency. USMLE scores are required or recommended for certain programs.
+Applicants must be medical school graduates from recognized institutions. Some programs have additional requirements. For example, all programs at Saint Joseph University of Beirut require French language proficiency. IFOM 1 and IFOM 2 scores are required or recommended for certain programs.
 
 ## Common questions
 Can I change selections after submitting? No, submissions are locked. Contact the LGC if there was an error.
@@ -62,7 +62,7 @@ Can I apply to both residency and fellowship? Yes, on separate tracks. Note that
 How are ties broken? By earliest submission time.
 What if I decline my offer? The seat is released, you become unmatched, and the decision is final for the cycle.
 Can I see my ranking on a program's list? No, rankings are confidential.
-What documents do I need? At minimum, transcript, CV, medical license, and government identification. Recommendation letters and USMLE scores are recommended where relevant.
+What documents do I need? At minimum, transcript, CV, medical license, and government identification. Recommendation letters and IFOM 1 and IFOM 2 scores are recommended where relevant.
 Who do I contact for help? For technical issues, use the LRFAP support page. For application questions, contact the LGC. For program-specific questions, contact the university directly.
 
 ## What LRFAP does not handle
