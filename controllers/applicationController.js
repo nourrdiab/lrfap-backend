@@ -4,6 +4,7 @@ const Cycle = require('../models/Cycle');
 const ApplicantProfile = require('../models/ApplicantProfile');
 const { logAction } = require('../utils/audit');
 const { notify } = require('../utils/notify');
+const { sendEmail, applicationSubmittedTemplate } = require('../utils/email');
 
 const generateReference = (track, year) => {
   const prefix = track === 'residency' ? 'R' : 'F';
@@ -172,6 +173,19 @@ exports.submitApplication = async (req, res) => {
       link: `/applicant/applications/${application._id}`,
       metadata: { applicationId: application._id, submissionReference: application.submissionReference },
     });
+
+    if (req.user.email) {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      sendEmail({
+        to: req.user.email,
+        subject: 'Your LRFAP application has been received',
+        html: applicationSubmittedTemplate({
+          firstName: req.user.firstName,
+          submissionReference: application.submissionReference,
+          applicationLink: `${frontendUrl}/applicant/applications/${application._id}`,
+        }),
+      }).catch((err) => console.error('Submission email failed:', err.message));
+    }
 
     res.json({
       message: 'Application submitted successfully',
