@@ -2,6 +2,15 @@ const Program = require('../models/Program');
 
 exports.createProgram = async (req, res) => {
   try {
+    if (req.user.role === 'university') {
+      if (!req.user.university) {
+        return res.status(403).json({ error: 'Forbidden: account is not linked to a university' });
+      }
+      if (req.body.university && req.body.university.toString() !== req.user.university.toString()) {
+        return res.status(403).json({ error: 'Forbidden: cannot create programs for a different university' });
+      }
+      req.body.university = req.user.university;
+    }
     if (req.body.availableSeats === undefined) req.body.availableSeats = req.body.capacity;
     const program = await Program.create(req.body);
     res.status(201).json(program);
@@ -37,6 +46,19 @@ exports.getProgram = async (req, res) => {
 
 exports.updateProgram = async (req, res) => {
   try {
+    if (req.user.role === 'university') {
+      if (!req.user.university) {
+        return res.status(403).json({ error: 'Forbidden: account is not linked to a university' });
+      }
+      const existing = await Program.findById(req.params.id).select('university');
+      if (!existing) return res.status(404).json({ error: 'Program not found' });
+      if (existing.university.toString() !== req.user.university.toString()) {
+        return res.status(403).json({ error: 'Forbidden: program does not belong to your institution' });
+      }
+      if (req.body.university && req.body.university.toString() !== req.user.university.toString()) {
+        return res.status(403).json({ error: 'Forbidden: cannot reassign program to a different university' });
+      }
+    }
     const program = await Program.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
     if (!program) return res.status(404).json({ error: 'Program not found' });
     res.json(program);

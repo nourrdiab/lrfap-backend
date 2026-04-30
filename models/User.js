@@ -39,6 +39,13 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'University',
       default: null,
+      validate: {
+        validator: function (value) {
+          if (this.role === 'university' && !value) return false;
+          return true;
+        },
+        message: 'University is required for university-role users',
+      },
     },
     isActive: {
       type: Boolean,

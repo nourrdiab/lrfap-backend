@@ -80,8 +80,12 @@ exports.getApplicationDetail = async (req, res) => {
     if (!application) return res.status(404).json({ error: 'Application not found' });
 
     if (req.user.role === 'university') {
+      if (!req.user.university) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const myUniversityId = req.user.university.toString();
       const belongsToUniversity = application.selections.some(
-        (s) => s.program.university._id.toString() === req.user.university.toString()
+        (s) => s.program?.university?._id?.toString() === myUniversityId
       );
       if (!belongsToUniversity) {
         return res.status(403).json({ error: 'Forbidden' });
