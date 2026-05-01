@@ -64,7 +64,8 @@ exports.getMyPrograms = async (req, res) => {
     }
     const programs = await Program.find(filter)
       .populate('specialty', 'name code')
-      .populate('cycle', 'name year status');
+      .populate('cycle', 'name year status')
+      .populate('university', 'name code');
     res.json(programs);
   } catch (error) {
     res.status(500).json({ error: error.message });
