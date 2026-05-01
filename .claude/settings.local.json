@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git -C \"C:/Users/Dell/Desktop/Uni/Uni Studies/Spring 2026/CSC 599/LRFAP/lrfap-backend\" status --short)"
+      "Bash(git -C \"C:/Users/Dell/Desktop/Uni/Uni Studies/Spring 2026/CSC 599/LRFAP/lrfap-backend\" status --short)",
+      "Bash(node --check controllers/dashboardController.js)",
+      "Bash(npx tsc *)",
+      "Bash(npx --prefix \"C:/Users/Dell/Desktop/Uni/Uni Studies/Spring 2026/CSC 599/LRFAP/lrfap-frontend\" tsc -b \"C:/Users/Dell/Desktop/Uni/Uni Studies/Spring 2026/CSC 599/LRFAP/lrfap-frontend\" --noEmit)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git *)",
+      "Bash(node *)"
     ]
   }
 }
