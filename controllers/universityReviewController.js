@@ -1,4 +1,5 @@
 const Application = require('../models/Application');
+const ApplicantProfile = require('../models/ApplicantProfile');
 const Program = require('../models/Program');
 const ProgramRanking = require('../models/ProgramRanking');
 const ApplicationReviewState = require('../models/ApplicationReviewState');
@@ -136,6 +137,13 @@ exports.getApplicationDetail = async (req, res) => {
 
     if (!application) return res.status(404).json({ error: 'Application not found' });
 
+    // Reviewer-facing detail includes the applicant's profile so the
+    // university committee can see medical school, languages, IFOM
+    // scores, research, etc. without bouncing to a separate endpoint.
+    const applicantProfile = await ApplicantProfile.findOne({
+      user: application.applicant._id,
+    }).populate('medicalSchool', 'name code');
+
     if (req.user.role === 'university') {
       if (!req.user.university) {
         return res.status(403).json({ error: 'Forbidden' });
@@ -153,10 +161,13 @@ exports.getApplicationDetail = async (req, res) => {
         university: req.user.university,
       });
       obj.reviewState = rs?.state || 'new';
+      obj.applicantProfile = applicantProfile;
       return res.json(obj);
     }
 
-    res.json(application);
+    const obj = application.toObject();
+    obj.applicantProfile = applicantProfile;
+    res.json(obj);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -469,11 +469,13 @@ exports.getUniversityProgramCounts = async (req, res) => {
       'withdrawn',
     ];
 
-    // pendingReview is the per-university review-workflow inbox: count
-    // ApplicationReviewState rows for this university whose state is
-    // 'new' or 'under_review', joined to applications in the active
-    // cycle that are not withdrawn (and not draft, mirroring the rest
-    // of the university portal).
+    // pendingReview is the per-university review-workflow inbox.
+    // ApplicationReviewState rows are only created when a reviewer first
+    // hits "Begin Review" / "Mark Reviewed" (lazy upsert) — fresh
+    // submissions have no row yet but the per-program detail UI
+    // defaults a missing row to state='new'. We mirror that here:
+    //   pending = (reviewable cycle apps) − (rows in 'reviewed' or 'matched')
+    // i.e. missing-row + 'new' + 'under_review' all count as pending.
     const [aggResults, pendingReview] = await Promise.all([
       Application.aggregate([
         {
@@ -517,11 +519,12 @@ exports.getUniversityProgramCounts = async (req, res) => {
           status: { $in: ['submitted', 'under_review', 'matched', 'unmatched'] },
         }).distinct('_id');
         if (cycleAppIds.length === 0) return 0;
-        return ApplicationReviewState.countDocuments({
+        const completed = await ApplicationReviewState.countDocuments({
           university: universityId,
           application: { $in: cycleAppIds },
-          state: { $in: ['new', 'under_review'] },
+          state: { $in: ['reviewed', 'matched'] },
         });
+        return cycleAppIds.length - completed;
       })(),
     ]);
     const facet = aggResults[0];
