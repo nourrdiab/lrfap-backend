@@ -8,6 +8,7 @@ const Cycle = require('../models/Cycle');
 const ApplicantProfile = require('../models/ApplicantProfile');
 const AuditLog = require('../models/AuditLog');
 const ProgramRanking = require('../models/ProgramRanking');
+const ApplicationReviewState = require('../models/ApplicationReviewState');
 
 exports.getLGCDashboard = async (req, res) => {
   try {
@@ -455,6 +456,7 @@ exports.getUniversityProgramCounts = async (req, res) => {
         universityId: universityId.toString(),
         cycleId: cycleId.toString(),
         totalUniqueApplicants: 0,
+        pendingReview: 0,
         programs: [],
       });
     }
@@ -467,41 +469,62 @@ exports.getUniversityProgramCounts = async (req, res) => {
       'withdrawn',
     ];
 
-    const [facet] = await Application.aggregate([
-      {
-        $match: {
-          cycle: cycleId,
-          'selections.program': { $in: programIds },
-          status: { $in: VISIBLE_STATUSES },
+    // pendingReview is the per-university review-workflow inbox: count
+    // ApplicationReviewState rows for this university whose state is
+    // 'new' or 'under_review', joined to applications in the active
+    // cycle that are not withdrawn (and not draft, mirroring the rest
+    // of the university portal).
+    const [aggResults, pendingReview] = await Promise.all([
+      Application.aggregate([
+        {
+          $match: {
+            cycle: cycleId,
+            'selections.program': { $in: programIds },
+            status: { $in: VISIBLE_STATUSES },
+          },
         },
-      },
-      { $unwind: '$selections' },
-      { $match: { 'selections.program': { $in: programIds } } },
-      {
-        $facet: {
-          perProgram: [
-            {
-              $group: {
-                _id: { program: '$selections.program', status: '$status' },
-                count: { $sum: 1 },
-              },
-            },
-            {
-              $group: {
-                _id: '$_id.program',
-                statuses: {
-                  $push: { status: '$_id.status', count: '$count' },
+        { $unwind: '$selections' },
+        { $match: { 'selections.program': { $in: programIds } } },
+        {
+          $facet: {
+            perProgram: [
+              {
+                $group: {
+                  _id: { program: '$selections.program', status: '$status' },
+                  count: { $sum: 1 },
                 },
               },
-            },
-          ],
-          uniqueApplicants: [
-            { $group: { _id: '$applicant' } },
-            { $count: 'total' },
-          ],
+              {
+                $group: {
+                  _id: '$_id.program',
+                  statuses: {
+                    $push: { status: '$_id.status', count: '$count' },
+                  },
+                },
+              },
+            ],
+            uniqueApplicants: [
+              { $group: { _id: '$applicant' } },
+              { $count: 'total' },
+            ],
+          },
         },
-      },
+      ]),
+      (async () => {
+        const cycleAppIds = await Application.find({
+          cycle: cycleId,
+          'selections.program': { $in: programIds },
+          status: { $in: ['submitted', 'under_review', 'matched', 'unmatched'] },
+        }).distinct('_id');
+        if (cycleAppIds.length === 0) return 0;
+        return ApplicationReviewState.countDocuments({
+          university: universityId,
+          application: { $in: cycleAppIds },
+          state: { $in: ['new', 'under_review'] },
+        });
+      })(),
     ]);
+    const facet = aggResults[0];
 
     const emptyCounts = () => ({
       submitted: 0,
@@ -533,6 +556,7 @@ exports.getUniversityProgramCounts = async (req, res) => {
       universityId: universityId.toString(),
       cycleId: cycleId.toString(),
       totalUniqueApplicants: facet?.uniqueApplicants?.[0]?.total ?? 0,
+      pendingReview,
       programs,
     });
   } catch (error) {

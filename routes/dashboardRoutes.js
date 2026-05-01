@@ -76,10 +76,12 @@ router.get(
  *     description: >
  *       Aggregation replacement for the University dashboard's old
  *       per-program applications fetch. Returns status counts per
- *       program (submitted, under_review, matched, unmatched, withdrawn)
- *       plus the total count of unique applicants across those programs
- *       for the given cycle. Scoped to the authenticated university
- *       reviewer's institution.
+ *       program (submitted, under_review, matched, unmatched, withdrawn),
+ *       the total count of unique applicants across those programs, and
+ *       a `pendingReview` count derived from per-university review states
+ *       (states 'new' or 'under_review' on non-withdrawn applications in
+ *       the cycle). Scoped to the authenticated university reviewer's
+ *       institution.
  *     security:
  *       - bearerAuth: []
  *     parameters:
