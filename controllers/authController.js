@@ -61,6 +61,7 @@ const register = async (req, res) => {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        isFirstLogin: true,
       },
     });
   } catch (error) {
@@ -95,6 +96,7 @@ const login = async (req, res) => {
       return res.status(403).json({ error: 'Account is deactivated' });
     }
 
+    const isFirstLogin = !user.lastLoginAt;
     user.lastLoginAt = new Date();
     await user.save();
 
@@ -121,6 +123,7 @@ const login = async (req, res) => {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        isFirstLogin,
       },
     });
   } catch (error) {
