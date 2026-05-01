@@ -42,6 +42,7 @@ const programSchema = new mongoose.Schema(
       type: String,
       trim: true,
       maxlength: 1000,
+      default: '',
     },
     extraRequirements: {
       type: [String],
