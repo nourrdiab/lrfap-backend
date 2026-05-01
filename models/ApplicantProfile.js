@@ -32,8 +32,8 @@ const applicantProfileSchema = new mongoose.Schema(
       arabic: { type: String, enum: ['none', 'basic', 'intermediate', 'fluent', 'native'], default: 'none' },
     },
 
-    usmleStep1: { type: Number, min: 0, max: 300 },
-    usmleStep2: { type: Number, min: 0, max: 300 },
+    usmleStep1: { type: Number, min: 0, max: 100 },
+    usmleStep2: { type: Number, min: 0, max: 100 },
 
     research: { type: String, trim: true, maxlength: 2000 },
     publications: { type: String, trim: true, maxlength: 2000 },
